@@ -17,8 +17,8 @@ export async function GET(
     const { id } = await params;
     const session = await requireAuth();
 
-    // Non-super-admins must be scoped to their own institution
-    if (session.role !== "SUPER_ADMIN") {
+    // Non-super-admins and non-verification-officers must be scoped to their own institution
+    if (session.role !== "SUPER_ADMIN" && session.role !== "VERIFICATION_OFFICER") {
       await requireInstitutionScope(id);
     }
 
@@ -64,8 +64,8 @@ export async function PATCH(
       return apiError("Institution not found", "NOT_FOUND", 404);
     }
 
-    // Only allow edits when DRAFT or CORRECTION_REQUIRED
-    if (!["DRAFT", "CORRECTION_REQUIRED"].includes(institution.status)) {
+    // Institution Admins can only edit when in DRAFT or CORRECTION_REQUIRED; Super Admin has statutory authority
+    if (session.role !== "SUPER_ADMIN" && !["DRAFT", "CORRECTION_REQUIRED"].includes(institution.status)) {
       return apiError(
         "Institution can only be edited when in DRAFT or CORRECTION_REQUIRED status",
         "INVALID_STATE",
@@ -85,7 +85,18 @@ export async function PATCH(
       );
     }
 
-    Object.assign(institution, parsed.data);
+    const updates = parsed.data;
+    if (updates.address) {
+      institution.address = {
+        street: updates.address.street ?? institution.address.street,
+        city: updates.address.city ?? institution.address.city,
+        district: updates.address.district ?? institution.address.district,
+        state: updates.address.state ?? institution.address.state,
+        pincode: updates.address.pincode ?? institution.address.pincode,
+      };
+      delete updates.address;
+    }
+    Object.assign(institution, updates);
     await institution.save();
 
     return apiSuccess({ institution });

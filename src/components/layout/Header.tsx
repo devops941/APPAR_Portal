@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, Bell, LogOut, User } from "lucide-react";
+import { Search, Bell, LogOut, User, Calendar } from "lucide-react";
 import Link from "next/link";
 
 interface MeResponse {
@@ -17,6 +17,7 @@ interface MeResponse {
 export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [user, setUser] = useState<MeResponse["data"] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [currentDate, setCurrentDate] = useState("");
 
   useEffect(() => {
     fetch("/api/me")
@@ -25,80 +26,103 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         if (data?.success && data.data) setUser(data.data);
       })
       .catch(() => {});
+
+    // Live formatted date
+    const d = new Date();
+    const formatted = d.toLocaleDateString("en-US", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    setCurrentDate(formatted);
   }, []);
 
-  return (
-    <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-border bg-surface px-4 lg:px-6">
-      {/* Mobile menu button */}
-      <button
-        onClick={onMenuClick}
-        className="rounded-md p-2 text-ink-muted hover:bg-canvas lg:hidden"
-        aria-label="Open menu"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "SS";
 
-      {/* Page context */}
-      <div className="hidden lg:block">
-        <p className="text-sm font-medium text-ink">
-          APAAR Student Academic Platform
-        </p>
+  return (
+    <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-border bg-surface px-4 sm:px-6 lg:px-8 shadow-xs">
+      {/* Search Input matching reference UI */}
+      <div className="flex items-center gap-3 flex-1 max-w-md">
+        <div className="relative w-full">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search students, APAAR IDs, records, institutions..."
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-10 pr-4 text-xs text-ink placeholder:text-slate-400 focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+          />
+        </div>
       </div>
 
-      {/* Right actions */}
-      <div className="flex items-center gap-3">
+      {/* Right Action Icons & User Chip */}
+      <div className="flex items-center gap-4">
+        {/* Date Pill */}
+        <div className="hidden sm:flex items-center gap-2 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-1.5 text-[11px] font-medium text-slate-600 shadow-2xs">
+          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+          <span>{currentDate || "Thu, 29 Oct 2026"}</span>
+        </div>
+
+        {/* Notifications */}
         <button
-          className="rounded-md p-2 text-ink-muted hover:bg-canvas"
+          className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
           aria-label="Notifications"
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-4.5 w-4.5" />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-emerald-600 ring-2 ring-white animate-pulse" />
         </button>
 
-        {/* User menu */}
+        <div className="h-6 w-px bg-slate-200" />
+
+        {/* User Profile Pill matching screenshot */}
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-canvas"
+            className="flex items-center gap-2.5 rounded-xl p-1 hover:bg-slate-100 transition group text-left"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-medium text-white">
-              {user?.name?.charAt(0).toUpperCase() ?? <User className="h-4 w-4" />}
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 via-teal-600 to-teal-700 text-xs font-bold text-white shadow-xs">
+              {initials}
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
             </div>
-            <div className="hidden text-left sm:block">
-              <p className="text-sm font-medium text-ink">
-                {user?.name ?? "Loading..."}
+
+            <div className="hidden md:block">
+              <p className="text-xs font-semibold text-ink leading-tight">
+                {user?.name || "System Super Administrator"}
               </p>
-              <p className="text-xs text-ink-muted">
-                {user?.role?.replace(/_/g, " ") ?? ""}
+              <p className="text-[10px] text-slate-500 capitalize">
+                {user?.role ? user.role.replace(/_/g, " ").toLowerCase() : "System Administrator"}
               </p>
             </div>
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-border bg-surface py-2 shadow-lg">
-              <div className="border-b border-border px-4 py-2">
-                <p className="text-sm font-medium text-ink">
-                  {user?.name ?? "Guest"}
-                </p>
-                <p className="text-xs text-ink-muted">{user?.email ?? ""}</p>
-                {user?.institutionName && (
-                  <p className="text-xs text-ink-muted">{user.institutionName}</p>
-                )}
+            <div className="absolute right-0 top-full z-50 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl animate-in fade-in zoom-in-95 duration-100">
+              <div className="border-b border-slate-100 px-3 py-2.5">
+                <p className="text-xs font-semibold text-ink">{user?.name || "Super Administrator"}</p>
+                <p className="text-[11px] text-slate-500 truncate">{user?.email || "admin@aicte.gov.in"}</p>
+                <span className="mt-1 inline-block rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+                  {user?.role || "SUPER_ADMIN"}
+                </span>
               </div>
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-ink-light hover:bg-canvas"
-              >
-                <User className="h-4 w-4" /> My Profile
-              </Link>
-              <button
-                onClick={async () => {
-                  await fetch("/api/auth/logout", { method: "POST" });
-                  window.location.href = "/login";
-                }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-danger hover:bg-canvas"
-              >
-                <LogOut className="h-4 w-4" /> Logout
-              </button>
+
+              <div className="pt-1">
+                <button
+                  onClick={async () => {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                    window.location.href = "/login";
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

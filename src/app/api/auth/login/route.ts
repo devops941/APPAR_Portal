@@ -33,6 +33,10 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
+    // Auto-initialize Super Admin if database was wiped or running fresh
+    const { ensureSuperAdminSeeded } = await import("@/services/super-admin-seed.service");
+    await ensureSuperAdminSeeded();
+
     // 1. Check dedicated SuperAdmin table first
     const superAdmin = await SuperAdmin.findOne({ email: normalizedEmail });
     if (superAdmin) {

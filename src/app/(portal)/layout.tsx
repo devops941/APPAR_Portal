@@ -33,7 +33,7 @@ export default function PortalLayout({
       {/* Main content area */}
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onMenuClick={() => setMobileOpen(true)} />
-        <main className="mx-auto w-full max-w-7xl flex-1 p-4 lg:p-6">
+        <main className="w-full flex-1 px-4 py-6 sm:px-6 lg:px-8">
           {children}
         </main>
       </div>

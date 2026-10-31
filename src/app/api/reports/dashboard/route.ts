@@ -37,28 +37,43 @@ export async function GET(request: NextRequest) {
     const apaarCoveragePct =
       totalStudents > 0 ? Number(((apaarRecorded / totalStudents) * 100).toFixed(1)) : 0;
 
-    // Verification status distribution for donut chart
+    // Verification status distribution for donut chart with Emerald/Teal palette
     const verificationBreakdown = [
-      { name: "Verified", value: verifiedRecords, color: "#15803d" },
-      { name: "Pending", value: pendingReviews, color: "#64748b" },
-      { name: "Under Review", value: underReviewRecords, color: "#b45309" },
-      { name: "Correction Required", value: correctionRecords, color: "#2563eb" },
-      { name: "Rejected", value: rejectedRecords, color: "#b42318" },
+      { name: "Verified", value: verifiedRecords, color: "#059669" },
+      { name: "Pending", value: pendingReviews, color: "#0d9488" },
+      { name: "Under Review", value: underReviewRecords, color: "#d97706" },
+      { name: "Correction Required", value: correctionRecords, color: "#3b82f6" },
+      { name: "Rejected", value: rejectedRecords, color: "#e11d48" },
     ].filter((d) => d.value > 0);
 
-    // Department-wise APAAR adoption for bar chart
+    // Department-wise APAAR adoption for bar chart (consolidated by department name)
     const departmentStats = await Student.aggregate([
       { $match: filter },
       {
+        $lookup: {
+          from: "departments",
+          localField: "departmentId",
+          foreignField: "_id",
+          as: "dept",
+        },
+      },
+      { $unwind: { path: "$dept", preserveNullAndEmptyArrays: true } },
+      {
         $group: {
-          _id: "$departmentId",
+          _id: { $ifNull: ["$dept.name", "Unassigned"] },
           total: { $sum: 1 },
           withApaar: { $sum: { $cond: [{ $ifNull: ["$apaarId", false] }, 1, 0] } },
         },
       },
-      { $lookup: { from: "departments", localField: "_id", foreignField: "_id", as: "dept" } },
-      { $unwind: { path: "$dept", preserveNullAndEmptyArrays: true } },
-      { $project: { name: { $ifNull: ["$dept.name", "Unassigned"] }, total: 1, withApaar: 1 } },
+      {
+        $project: {
+          _id: 0,
+          name: "$_id",
+          total: 1,
+          withApaar: 1,
+        },
+      },
+      { $sort: { total: -1 } },
     ]);
 
     return apiSuccess({

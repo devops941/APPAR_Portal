@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from "@/lib/api-response";
 import { requireRole, AuthError } from "@/lib/auth/guards";
 import { VerificationRequest } from "@/models/VerificationRequest";
 import { Student } from "@/models/Student";
+import { Institution } from "@/models/Institution";
 import { maskApaarId } from "@/lib/utils/apaar";
 
 /**
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
 
     const requests = await VerificationRequest.find(filter)
       .populate("studentId", "fullName registerNumber apaarId")
+      .populate("institutionId", "name code")
       .sort({ createdAt: -1 })
       .lean();
 

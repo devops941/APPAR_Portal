@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils/cn";
+import { CheckCircle2, Clock, AlertTriangle, XCircle, FileEdit, ShieldCheck } from "lucide-react";
 
 type BadgeVariant =
   | "default"
@@ -9,12 +10,12 @@ type BadgeVariant =
   | "primary";
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: "bg-slate-100 text-slate-700",
-  success: "bg-green-100 text-green-700",
-  warning: "bg-amber-100 text-amber-700",
-  danger: "bg-red-100 text-red-700",
-  info: "bg-blue-100 text-blue-700",
-  primary: "bg-teal-100 text-teal-700",
+  default: "bg-slate-50 text-slate-600 border-slate-200",
+  success: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
+  warning: "bg-amber-50 text-amber-700 border-amber-200/80",
+  danger: "bg-rose-50 text-rose-700 border-rose-200/80",
+  info: "bg-teal-50 text-teal-700 border-teal-200/80",
+  primary: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
 };
 
 export function Badge({
@@ -29,7 +30,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border tracking-wide",
         variantClasses[variant],
         className
       )}
@@ -46,7 +47,7 @@ const statusVariantMap: Record<string, BadgeVariant> = {
   REJECTED: "danger",
   CORRECTION_REQUIRED: "warning",
   DRAFT: "default",
-  PENDING: "default",
+  PENDING: "warning",
   ACTIVE: "success",
   GRADUATED: "info",
   TRANSFERRED: "warning",
@@ -55,10 +56,18 @@ const statusVariantMap: Record<string, BadgeVariant> = {
 
 export function StatusBadge({ status }: { status: string }) {
   const variant = statusVariantMap[status] ?? "default";
-  const label = status.replace(/_/g, " ");
+  const label = status ? status.replace(/_/g, " ") : "Unknown";
+
+  let Icon = CheckCircle2;
+  if (variant === "success") Icon = ShieldCheck;
+  else if (variant === "warning") Icon = Clock;
+  else if (variant === "danger") Icon = XCircle;
+  else if (variant === "default") Icon = FileEdit;
+
   return (
     <Badge variant={variant}>
-      {label.charAt(0).toUpperCase() + label.slice(1).toLowerCase()}
+      <Icon className="h-3 w-3" />
+      <span>{label.charAt(0).toUpperCase() + label.slice(1).toLowerCase()}</span>
     </Badge>
   );
 }

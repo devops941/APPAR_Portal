@@ -33,6 +33,10 @@ if (!global.mongooseCache) {
  */
 export async function connectToDatabase(): Promise<Connection> {
   if (cached.conn) {
+    // Background check to ensure Super Admin exists even if connection was already open
+    import("@/services/super-admin-seed.service")
+      .then((m) => m.ensureSuperAdminSeeded())
+      .catch(() => {});
     return cached.conn;
   }
 

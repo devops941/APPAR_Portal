@@ -62,9 +62,28 @@ export async function GET(
       request,
     });
 
+    let mimeType = document.mimeType || "application/octet-stream";
+    if (
+      buffer.length >= 4 &&
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47
+    ) {
+      mimeType = "image/png";
+    } else if (
+      buffer.length >= 4 &&
+      buffer[0] === 0x25 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x44 &&
+      buffer[3] === 0x46
+    ) {
+      mimeType = "application/pdf";
+    }
+
     return new Response(new Uint8Array(buffer), {
       headers: {
-        "Content-Type": document.mimeType,
+        "Content-Type": mimeType,
         "Content-Disposition": `inline; filename="${encodeURIComponent(document.originalFileName)}"`,
         "X-Content-Type-Options": "nosniff",
         "Content-Length": buffer.length.toString(),

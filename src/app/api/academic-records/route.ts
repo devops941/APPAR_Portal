@@ -8,6 +8,9 @@ import { AcademicRecord } from "@/models/AcademicRecord";
 import { createAcademicRecordSchema } from "@/validators/academic";
 import { calculateGradePoint, computeSgpa } from "@/lib/utils/grading";
 
+import { Student } from "@/models/Student";
+import { DocumentModel } from "@/models/Document";
+
 /**
  * GET /api/academic-records?studentId=&semester=
  * Returns records scoped to student or institution.
@@ -20,19 +23,63 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get("studentId");
     const semester = searchParams.get("semester");
+    const institutionId = searchParams.get("institutionId");
 
     const filter: Record<string, unknown> = {};
     if (studentId) filter.studentId = studentId;
     if (semester) filter.semester = parseInt(semester);
+    if (institutionId) filter.institutionId = institutionId;
 
-    // Tenant scoping for non-super-admins
-    if (session.role !== "SUPER_ADMIN" && session.institutionId) {
+    // Student role scoping: students only see their own verified/submitted records
+    if (session.role === "STUDENT") {
+      const student = await Student.findOne({ userId: session.userId }).select("_id");
+      if (student) {
+        filter.studentId = student._id;
+      } else {
+        filter.studentId = new mongoose.Types.ObjectId();
+      }
+    } else if (session.role !== "SUPER_ADMIN" && session.role !== "VERIFICATION_OFFICER" && session.institutionId) {
+      // Tenant scoping for institution-level staff
       filter.institutionId = session.institutionId;
     }
 
     const records = await AcademicRecord.find(filter)
-      .sort({ semester: 1, version: -1 })
+      .populate("studentId", "fullName registerNumber apaarId departmentId")
+      .populate("institutionId", "name code")
+      .sort({ createdAt: -1, semester: 1, version: -1 })
       .lean();
+
+    // Check and resolve any marksheet scan linked via DocumentModel
+    const recordIdsWithoutScan = records.filter((r) => !r.marksheetUrl).map((r) => r._id);
+    if (recordIdsWithoutScan.length > 0) {
+      const docIds = records.filter((r) => r.documentId).map((r) => r.documentId);
+      const orClauses: Record<string, unknown>[] = [{ relatedAcademicRecordId: { $in: recordIdsWithoutScan } }];
+      if (docIds.length > 0) {
+        orClauses.push({ _id: { $in: docIds } });
+      }
+
+      const linkedDocs = await DocumentModel.find({ $or: orClauses }).lean();
+
+      const docMap = new Map();
+      for (const doc of linkedDocs) {
+        if (doc.relatedAcademicRecordId) {
+          docMap.set(doc.relatedAcademicRecordId.toString(), doc);
+        }
+        docMap.set(doc._id.toString(), doc);
+      }
+
+      for (const rec of records) {
+        if (!rec.marksheetUrl) {
+          const matchedDoc =
+            docMap.get(rec._id.toString()) ||
+            (rec.documentId ? docMap.get(rec.documentId.toString()) : null);
+          if (matchedDoc) {
+            rec.marksheetUrl = `/api/documents/${matchedDoc._id}/download`;
+            rec.documentId = matchedDoc._id;
+          }
+        }
+      }
+    }
 
     return apiSuccess({ records });
   } catch (error) {
@@ -62,6 +109,11 @@ export async function POST(request: NextRequest) {
 
     const data = parsed.data;
 
+    // Students cannot create or issue academic records
+    if (session.role === "STUDENT") {
+      return apiError("Students are not permitted to issue academic records", "FORBIDDEN", 403);
+    }
+
     // Scope check
     if (session.role !== "SUPER_ADMIN") {
       await requireInstitutionScope(data.institutionId);
@@ -69,15 +121,18 @@ export async function POST(request: NextRequest) {
 
     // Compute grades and SGPA server-side (never trust client calculations)
     const subjectsWithGrades = data.subjects.map((s) => {
-      const percentage = (s.marksObtained / s.maxMarks) * 100;
+      const maxMarks = s.maxMarks || 100;
+      const percentage = (s.marksObtained / maxMarks) * 100;
       const { grade, gradePoint, result } = calculateGradePoint(percentage);
       return {
-        subjectId: new mongoose.Types.ObjectId(s.subjectId),
-        subjectCode: s.subjectCode,
-        subjectName: s.subjectName,
+        subjectId: s.subjectId && mongoose.Types.ObjectId.isValid(s.subjectId)
+          ? new mongoose.Types.ObjectId(s.subjectId)
+          : undefined,
+        subjectCode: s.subjectCode.toUpperCase().trim(),
+        subjectName: s.subjectName.trim(),
         credits: s.credits,
         marksObtained: s.marksObtained,
-        maxMarks: s.maxMarks,
+        maxMarks,
         grade,
         gradePoint,
         result,
@@ -99,6 +154,9 @@ export async function POST(request: NextRequest) {
       existing.totalCredits = totalCredits;
       existing.sgpa = sgpa;
       existing.academicYear = data.academicYear;
+      if (data.marksheetUrl) existing.marksheetUrl = data.marksheetUrl;
+      if (data.marksheetPublicId) existing.marksheetPublicId = data.marksheetPublicId;
+      if (data.documentId) existing.documentId = new mongoose.Types.ObjectId(data.documentId);
       await existing.save();
 
       await logAudit({
@@ -123,6 +181,9 @@ export async function POST(request: NextRequest) {
       subjects: subjectsWithGrades,
       totalCredits,
       sgpa,
+      marksheetUrl: data.marksheetUrl,
+      marksheetPublicId: data.marksheetPublicId,
+      documentId: data.documentId ? new mongoose.Types.ObjectId(data.documentId) : undefined,
       status: "DRAFT",
       version: 1,
     });

@@ -18,7 +18,7 @@ export const RECORD_STATUSES: RecordStatus[] = [
 ];
 
 export interface ISubjectResult {
-  subjectId: mongoose.Types.ObjectId;
+  subjectId?: mongoose.Types.ObjectId;
   subjectCode: string;
   subjectName: string;
   credits: number;
@@ -39,6 +39,9 @@ export interface IAcademicRecord extends Document {
   sgpa: number;
   status: RecordStatus;
   version: number;
+  marksheetUrl?: string;
+  marksheetPublicId?: string;
+  documentId?: mongoose.Types.ObjectId;
   submittedBy?: mongoose.Types.ObjectId;
   submittedAt?: Date;
   verifiedAt?: Date;
@@ -54,7 +57,7 @@ const AcademicRecordSchema = new Schema<IAcademicRecord>(
     semester: { type: Number, required: true, min: 1, max: 16 },
     subjects: [
       {
-        subjectId: { type: Schema.Types.ObjectId, ref: "Subject", required: true },
+        subjectId: { type: Schema.Types.ObjectId, ref: "Subject", required: false },
         subjectCode: { type: String, required: true },
         subjectName: { type: String, required: true },
         credits: { type: Number, required: true },
@@ -74,6 +77,9 @@ const AcademicRecordSchema = new Schema<IAcademicRecord>(
       index: true,
     },
     version: { type: Number, default: 1 },
+    marksheetUrl: { type: String, trim: true },
+    marksheetPublicId: { type: String, trim: true },
+    documentId: { type: Schema.Types.ObjectId, ref: "Document" },
     submittedBy: { type: Schema.Types.ObjectId, ref: "User" },
     submittedAt: { type: Date },
     verifiedAt: { type: Date },

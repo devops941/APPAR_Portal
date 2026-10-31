@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/mongoose";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { requireAuth, AuthError } from "@/lib/auth/guards";
@@ -23,8 +24,15 @@ export async function GET(request: NextRequest) {
     const filter: Record<string, unknown> = {};
     if (studentId) filter.studentId = studentId;
 
-    // Tenant scoping
-    if (session.role !== "SUPER_ADMIN" && session.institutionId) {
+    // Student role scoping vs Institution scoping
+    if (session.role === "STUDENT") {
+      const student = await Student.findOne({ userId: session.userId });
+      if (student) {
+        filter.studentId = student._id;
+      } else {
+        filter.studentId = new mongoose.Types.ObjectId();
+      }
+    } else if (session.role !== "SUPER_ADMIN" && session.institutionId) {
       filter.institutionId = session.institutionId;
     }
 

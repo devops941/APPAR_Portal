@@ -3,7 +3,7 @@ import { z } from "zod";
 export const createStudentSchema = z.object({
   institutionId: z.string(),
   departmentId: z.string(),
-  registerNumber: z.string().min(1, "Register number is required"),
+  registerNumber: z.string().optional().or(z.literal("")),
   apaarId: z.string().regex(/^\d{12}$/, "APAAR ID must be 12 digits").optional(),
   fullName: z.string().min(1, "Full name is required"),
   dateOfBirth: z.string().transform((v) => new Date(v)),

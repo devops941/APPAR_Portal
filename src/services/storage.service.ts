@@ -54,31 +54,45 @@ export async function saveFile(
   const sha256Hash = computeSha256(buffer);
   const ext = path.extname(originalName).toLowerCase();
 
+  // Always ensure upload dir exists and write local cache copy
+  await ensureUploadDirExists();
+
   if (env.DOCUMENT_STORAGE_PROVIDER === "cloudinary" && env.CLOUDINARY_CLOUD_NAME) {
     const cloud = await getCloudinary();
 
-    return new Promise((resolve, reject) => {
+    const result: { public_id?: string } = await new Promise((resolve, reject) => {
       const uploadStream = cloud.uploader.upload_stream(
         {
           resource_type: "auto",
           folder: env.DOCUMENT_STORAGE_BUCKET || "apaar-documents",
           public_id: `${uuidv4()}`,
         },
-        (error: Error | null, result: { public_id?: string } | undefined) => {
+        (error: Error | null, res: { public_id?: string } | undefined) => {
           if (error) return reject(error);
-          resolve({
-            storageKey: result?.public_id ?? "",
-            sha256Hash,
-            provider: "cloudinary",
-          });
+          resolve(res || {});
         }
       );
       uploadStream.end(buffer);
     });
+
+    const storageKey = result?.public_id ?? `${uuidv4()}`;
+
+    // Cache locally with sanitized key
+    try {
+      const localCachedName = `${storageKey.replace(/\//g, "_")}${ext}`;
+      await fs.writeFile(path.join(UPLOAD_DIR, localCachedName), buffer);
+    } catch {
+      // ignore caching errors
+    }
+
+    return {
+      storageKey,
+      sha256Hash,
+      provider: "cloudinary",
+    };
   }
 
   // Local storage fallback
-  await ensureUploadDirExists();
   const storageKey = `${uuidv4()}${ext}`;
   const filePath = path.join(UPLOAD_DIR, storageKey);
   await fs.writeFile(filePath, buffer);
@@ -93,15 +107,56 @@ export async function getFileBuffer(
   storageKey: string,
   provider: "cloudinary" | "local"
 ): Promise<Buffer> {
-  if (provider === "cloudinary" && env.CLOUDINARY_CLOUD_NAME) {
-    const cloud = await getCloudinary();
-    const url = cloud.url(storageKey, { resource_type: "auto" });
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Failed to fetch file from Cloudinary");
-    return Buffer.from(await response.arrayBuffer());
+  // 1. Try local cache first (instant, works offline, zero network 401s)
+  try {
+    const directPath = path.join(UPLOAD_DIR, storageKey);
+    return await fs.readFile(directPath);
+  } catch {
+    try {
+      const sanitized = storageKey.replace(/\//g, "_");
+      const files = await fs.readdir(UPLOAD_DIR);
+      const match = files.find((f) => f.includes(sanitized) || f.includes(path.basename(storageKey)));
+      if (match) {
+        return await fs.readFile(path.join(UPLOAD_DIR, match));
+      }
+    } catch {
+      // ignore
+    }
   }
 
-  // Local storage
-  const filePath = path.join(UPLOAD_DIR, storageKey);
-  return await fs.readFile(filePath);
+  // 2. Fetch from Cloudinary
+  if (provider === "cloudinary" && env.CLOUDINARY_CLOUD_NAME) {
+    const cloud = await getCloudinary();
+    // Try auto URL
+    const autoUrl = cloud.url(storageKey, { resource_type: "auto", secure: true });
+    let response = await fetch(autoUrl);
+
+    // If Cloudinary restricts PDF download (status 401/404), fetch the high-res rasterized PNG
+    if (!response.ok) {
+      const pngUrl = `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/image/upload/${storageKey}.png`;
+      response = await fetch(pngUrl);
+    }
+
+    // Try direct image URL
+    if (!response.ok) {
+      const directUrl = `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/image/upload/${storageKey}`;
+      response = await fetch(directUrl);
+    }
+
+    if (response.ok) {
+      const buf = Buffer.from(await response.arrayBuffer());
+      // Save to local cache for future fast retrieval
+      try {
+        const localCachedName = `${storageKey.replace(/\//g, "_")}`;
+        await fs.writeFile(path.join(UPLOAD_DIR, localCachedName), buf);
+      } catch {
+        // ignore
+      }
+      return buf;
+    }
+
+    throw new Error(`Failed to fetch file from Cloudinary (HTTP ${response.status})`);
+  }
+
+  throw new Error("Document file not found in storage");
 }

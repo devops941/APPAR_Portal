@@ -5,9 +5,13 @@ import { requireAuth, requireInstitutionScope, AuthError } from "@/lib/auth/guar
 import { logAudit } from "@/services/audit.service";
 import { Student } from "@/models/Student";
 import { User } from "@/models/User";
+import { Department } from "@/models/Catalog";
 import { maskApaarId, normalizeApaarId } from "@/lib/utils/apaar";
 import { createStudentSchema } from "@/validators/student";
 import { hashPassword } from "@/lib/auth/password";
+import { getNextStudentRollNumber } from "@/lib/utils/sequence";
+import { Institution } from "@/models/Institution";
+import { sendStudentCredentialsEmail } from "@/services/email.service";
 
 /**
  * GET /api/students
@@ -24,12 +28,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
     const search = searchParams.get("search");
     const departmentId = searchParams.get("departmentId");
+    const institutionId = searchParams.get("institutionId");
 
     const filter: Record<string, unknown> = {};
 
     // Tenant scoping
     if (session.role !== "SUPER_ADMIN" && session.institutionId) {
       filter.institutionId = session.institutionId;
+    } else if (institutionId && institutionId !== "All") {
+      filter.institutionId = institutionId;
     }
 
     if (departmentId) filter.departmentId = departmentId;
@@ -44,6 +51,7 @@ export async function GET(request: NextRequest) {
     const [students, total] = await Promise.all([
       Student.find(filter)
         .populate("departmentId", "name code")
+        .populate("institutionId", "name code")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -93,14 +101,24 @@ export async function POST(request: NextRequest) {
       await requireInstitutionScope(data.institutionId);
     }
 
+    // Determine or auto-generate register / roll number
+    const finalRegisterNumber =
+      data.registerNumber && data.registerNumber.trim()
+        ? data.registerNumber.trim().toUpperCase()
+        : await getNextStudentRollNumber({
+            institutionId: data.institutionId,
+            departmentId: data.departmentId,
+            admissionYear: data.admissionYear,
+          });
+
     // Check duplicate register number in institution
     const existingReg = await Student.findOne({
       institutionId: data.institutionId,
-      registerNumber: data.registerNumber,
+      registerNumber: finalRegisterNumber,
     });
     if (existingReg) {
       return apiError(
-        `Student with register number "${data.registerNumber}" already exists`,
+        `Student with register number "${finalRegisterNumber}" already exists`,
         "CONFLICT",
         409
       );
@@ -117,8 +135,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create user account
-    const passwordHash = await hashPassword("Demo@12345");
+    // Check duplicate user email
+    const existingUser = await User.findOne({ email: data.email.toLowerCase() });
+    if (existingUser) {
+      return apiError(`User with email "${data.email}" already exists`, "CONFLICT", 409);
+    }
+
+    // Generate readable, secure temporary password (e.g. Student@4921)
+    const randomDigits = Math.floor(1000 + Math.random() * 9000);
+    const temporaryPassword = `Student@${randomDigits}`;
+    const passwordHash = await hashPassword(temporaryPassword);
+
     const user = await User.create({
       name: data.fullName,
       email: data.email.toLowerCase(),
@@ -134,7 +161,7 @@ export async function POST(request: NextRequest) {
       userId: user._id,
       institutionId: data.institutionId,
       departmentId: data.departmentId,
-      registerNumber: data.registerNumber,
+      registerNumber: finalRegisterNumber,
       apaarId: data.apaarId ? normalizeApaarId(data.apaarId) : undefined,
       fullName: data.fullName,
       dateOfBirth: data.dateOfBirth,
@@ -143,6 +170,27 @@ export async function POST(request: NextRequest) {
       currentSemester: data.currentSemester,
       academicStatus: data.academicStatus || "ACTIVE",
     });
+
+    // Fetch institution name for the email
+    const inst = await Institution.findById(data.institutionId).select("name").lean();
+
+    // Send credentials to student's email
+    let emailSent = false;
+    let emailError: string | undefined;
+    try {
+      const mailRes = await sendStudentCredentialsEmail({
+        studentName: student.fullName,
+        email: data.email.toLowerCase(),
+        registerNumber: student.registerNumber,
+        temporaryPassword,
+        institutionName: inst?.name || "Academic Institution",
+      });
+      emailSent = mailRes.success;
+      emailError = mailRes.error;
+    } catch (e) {
+      console.error("Failed to send student credentials email:", e);
+      emailError = (e as Error).message;
+    }
 
     await logAudit({
       session,
@@ -155,13 +203,26 @@ export async function POST(request: NextRequest) {
     });
 
     return apiSuccess(
-      { ...student.toObject(), apaarId: student.apaarId ? maskApaarId(student.apaarId) : undefined },
+      {
+        ...student.toObject(),
+        apaarId: student.apaarId ? maskApaarId(student.apaarId) : undefined,
+        credentials: {
+          loginEmail: data.email.toLowerCase(),
+          temporaryPassword,
+          emailSent,
+          emailError,
+        },
+      },
       undefined,
       201
     );
   } catch (error) {
     if (error instanceof AuthError) {
       return apiError(error.message, error.code, error.status);
+    }
+    if ((error as any)?.code === 11000) {
+      const field = Object.keys((error as any).keyPattern || {})[0] || "field";
+      return apiError(`A student or user with this ${field} already exists.`, "CONFLICT", 409);
     }
     console.error("POST /api/students error:", error);
     return apiError("Failed to create student", "INTERNAL_ERROR", 500);

@@ -49,9 +49,6 @@ const UserSchema = new Schema<IUser>(
     institutionId: {
       type: Schema.Types.ObjectId,
       ref: "Institution",
-      required: function (this: IUser) {
-        return this.role !== "SUPER_ADMIN" && this.role !== "VERIFICATION_OFFICER";
-      },
       index: true,
     },
     departmentId: {

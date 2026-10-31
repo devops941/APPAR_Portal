@@ -7,14 +7,17 @@ export const createAcademicRecordSchema = z.object({
   semester: z.number().int().min(1).max(16),
   subjects: z.array(
     z.object({
-      subjectId: z.string(),
+      subjectId: z.string().optional(),
       subjectCode: z.string(),
       subjectName: z.string(),
       credits: z.number().min(1).max(10),
       marksObtained: z.number().min(0).max(100),
-      maxMarks: z.number().default(100),
+      maxMarks: z.number().min(1).max(100).default(100),
     })
   ).min(1, "At least one subject is required"),
+  marksheetUrl: z.string().optional(),
+  marksheetPublicId: z.string().optional(),
+  documentId: z.string().optional(),
 });
 
 export type CreateAcademicRecordInput = z.infer<typeof createAcademicRecordSchema>;

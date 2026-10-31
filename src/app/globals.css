@@ -1,31 +1,37 @@
 @import "tailwindcss";
 
-/* ───────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────
    APAAR Platform — Design Tokens (Tailwind CSS v4)
-   Deep Teal brand palette per AICTE specification
-   ─────────────────────────────────────────────── */
+   AICTE Statutory Theme: Emerald & Electric Teal with Deep Forest Slate
+   ───────────────────────────────────────────────────────────── */
 
 @theme {
   /* Canvas & Surfaces */
-  --color-canvas: #f7f9fc;
+  --color-canvas: #f8fafc;
   --color-surface: #ffffff;
   --color-border: #e2e8f0;
 
-  /* Primary Brand (Deep Teal) */
-  --color-primary: #0f766e;
-  --color-primary-hover: #115e59;
-  --color-primary-light: #f0fdfa;
+  /* Primary Brand (Emerald & Electric Teal - AICTE Statutory Theme) */
+  --color-primary: #059669;
+  --color-primary-hover: #047857;
+  --color-primary-light: #ecfdf5;
+  --color-accent: #0d9488;
+  --color-accent-hover: #0f766e;
+
+  /* Sidebar Theme (Deep Forest Slate / Obsidian Teal) */
+  --color-sidebar: #061c18;
+  --color-sidebar-hover: #0c2d27;
 
   /* Ink / Typography */
-  --color-ink: #14263d;
+  --color-ink: #0f172a;
   --color-ink-light: #334155;
   --color-ink-muted: #64748b;
 
   /* Status Tokens */
-  --color-success: #15803d;
-  --color-warning: #b45309;
-  --color-danger: #b42318;
-  --color-info: #2563eb;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #0284c7;
 
   /* Fonts */
   --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
@@ -33,7 +39,7 @@
 }
 
 :root {
-  --background: #f7f9fc;
+  --background: #f8fafc;
   --foreground: #334155;
 }
 

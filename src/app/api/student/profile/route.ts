@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from "@/lib/api-response";
 import { requireAuth, AuthError } from "@/lib/auth/guards";
 import { Student } from "@/models/Student";
 import { Institution } from "@/models/Institution";
+import { Department } from "@/models/Catalog";
 import { maskApaarId } from "@/lib/utils/apaar";
 
 /**

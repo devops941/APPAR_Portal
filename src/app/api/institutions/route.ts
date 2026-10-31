@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
 
     const filter: Record<string, unknown> = {};
 
-    // Tenant scoping
-    if (session.role !== "SUPER_ADMIN") {
+    // Tenant scoping: SUPER_ADMIN and VERIFICATION_OFFICER can view all institutions
+    if (session.role !== "SUPER_ADMIN" && session.role !== "VERIFICATION_OFFICER") {
       if (!session.institutionId) {
         return apiSuccess({ institutions: [], meta: { total: 0 } });
       }

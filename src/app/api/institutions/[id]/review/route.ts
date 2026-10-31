@@ -18,7 +18,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const session = await requireRole(["SUPER_ADMIN"]);
+    const session = await requireRole(["SUPER_ADMIN", "VERIFICATION_OFFICER"]);
     await connectToDatabase();
 
     const body = await request.json();
@@ -38,17 +38,22 @@ export async function POST(
       return apiError("Institution not found", "NOT_FOUND", 404);
     }
 
-    // The review action implies the institution is currently UNDER_REVIEW
     const currentStatus: InstitutionStatus = institution.status;
-    if (currentStatus !== "UNDER_REVIEW") {
+    if (currentStatus === parsed.data.status) {
       return apiError(
-        `Institution must be UNDER_REVIEW to review (current: ${currentStatus})`,
+        `Institution is already ${currentStatus}`,
         "INVALID_STATE",
         400
       );
     }
 
-    if (!isValidInstitutionTransition(currentStatus, parsed.data.status)) {
+    // Automatically transition to UNDER_REVIEW during scrutiny if pending
+    let reviewableStatus = currentStatus;
+    if (currentStatus === "DRAFT" || currentStatus === "SUBMITTED" || currentStatus === "VERIFIED") {
+      reviewableStatus = "UNDER_REVIEW";
+    }
+
+    if (!isValidInstitutionTransition(reviewableStatus, parsed.data.status)) {
       return apiError(
         `Invalid transition from ${currentStatus} to ${parsed.data.status}`,
         "INVALID_TRANSITION",

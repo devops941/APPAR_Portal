@@ -22,6 +22,8 @@ export const createInstitutionSchema = z.object({
 
 export const updateInstitutionSchema = z.object({
   name: z.string().min(2).optional(),
+  code: z.string().min(3).optional(),
+  category: z.enum(["ENGINEERING", "POLYTECHNIC", "MANAGEMENT", "PHARMACY", "ARTS_SCIENCE"]).optional(),
   address: z
     .object({
       street: z.string().optional(),
