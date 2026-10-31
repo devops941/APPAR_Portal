@@ -14,10 +14,10 @@ import { jwtVerify } from "jose";
  *     * SUPER_ADMIN: Full system access across all administrative and compliance modules
  */
 
-const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout", "/api/health"];
+const PUBLIC_ROUTES = ["/", "/login", "/api/auth/login", "/api/auth/logout", "/api/health"];
 
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.includes(pathname);
+  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith("/images");
 }
 
 interface DecodedSession {
