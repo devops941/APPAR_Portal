@@ -20,11 +20,20 @@ import {
   Eye,
   MapPin,
   Mail,
-  User
+  User,
+  Download,
+  ExternalLink,
+  FileCheck2,
+  Cloud,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { KpiStatCard } from "@/components/ui/KpiStatCard";
+import {
+  DocumentPreviewModal,
+  type PreviewableDocument,
+} from "@/components/ui/DocumentPreviewModal";
+import type { InstitutionDocItem } from "@/components/institutions/InstitutionDocumentUploader";
 import Link from "next/link";
 
 const STATUS_TABS = [
@@ -63,6 +72,7 @@ interface InstitutionRecord {
   contactPhone: string;
   principalName: string;
   status: string;
+  documents?: InstitutionDocItem[];
   reviewRemarks?: string;
   reviewedAt?: string;
   createdAt: string;
@@ -75,6 +85,9 @@ export default function VerificationsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
+
+  // In-app Document Preview Modal
+  const [previewDoc, setPreviewDoc] = useState<PreviewableDocument | null>(null);
 
   // Inspect Modal for Student Records
   const [selectedReq, setSelectedReq] = useState<VerificationRequest | null>(null);
@@ -467,6 +480,15 @@ export default function VerificationsPage() {
                                 setSelectedInst(inst);
                                 setInstRemarks(inst.reviewRemarks || "");
                                 setInstError(null);
+                                // Fetch latest full institution record with fresh documents
+                                fetch(`/api/institutions/${inst._id}`)
+                                  .then((r) => r.json())
+                                  .then((data) => {
+                                    if (data?.success && data?.data?.institution) {
+                                      setSelectedInst(data.data.institution);
+                                    }
+                                  })
+                                  .catch(() => {});
                               }}
                               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer ${
                                 isPending
@@ -743,6 +765,136 @@ export default function VerificationsPage() {
               </div>
             </div>
 
+            {/* Attached Statutory Documents Section */}
+            <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <FileCheck2 className="h-4 w-4 text-emerald-600" />
+                  Statutory Accreditation Documents ({selectedInst.documents?.length || 0})
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <Cloud className="h-3 w-3" /> Cloudinary Secured
+                </span>
+              </div>
+
+              {(!selectedInst.documents || selectedInst.documents.length === 0) ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-white py-3 text-center text-xs text-slate-400">
+                  No accreditation documents attached to this institution record.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 rounded-lg border border-slate-200/80 bg-white max-h-48 overflow-y-auto">
+                  {selectedInst.documents.map((doc, idx) => {
+                    const isPdf =
+                      doc.mimeType?.includes("pdf") ||
+                      doc.originalFileName?.toLowerCase().endsWith(".pdf");
+                    const downloadUrl = `/api/institutions/${selectedInst._id}/documents/${doc._id || doc.storageKey}/download`;
+                    const streamUrl = doc.storageKey
+                      ? `/api/institutions/preview?key=${encodeURIComponent(
+                          doc.storageKey
+                        )}&provider=${doc.storageProvider || "cloudinary"}&name=${encodeURIComponent(
+                          doc.originalFileName
+                        )}`
+                      : "";
+                    const effectiveUrl = doc.url || downloadUrl || streamUrl;
+                    const formattedSize = doc.fileSizeBytes
+                      ? doc.fileSizeBytes > 1024 * 1024
+                        ? `${(doc.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB`
+                        : `${Math.round(doc.fileSizeBytes / 1024)} KB`
+                      : null;
+
+                    return (
+                      <div
+                        key={doc._id?.toString() || doc.storageKey || idx}
+                        className="flex items-center justify-between gap-2 p-2.5 hover:bg-slate-50 transition"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Live Image Thumbnail or PDF Badge */}
+                          {!isPdf && effectiveUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={effectiveUrl}
+                              alt={doc.title}
+                              className="h-10 w-10 shrink-0 rounded-lg object-cover border border-slate-200 shadow-2xs cursor-pointer hover:opacity-90 transition"
+                              onClick={() =>
+                                setPreviewDoc({
+                                  title: doc.title,
+                                  documentType: doc.documentType,
+                                  originalFileName: doc.originalFileName,
+                                  mimeType: doc.mimeType,
+                                  fileSizeBytes: doc.fileSizeBytes,
+                                  sha256Hash: doc.sha256Hash,
+                                  url: doc.url || effectiveUrl,
+                                  downloadUrl,
+                                  storageKey: doc.storageKey,
+                                })
+                              }
+                              onError={(e) => {
+                                if (streamUrl && e.currentTarget.src !== streamUrl) {
+                                  e.currentTarget.src = streamUrl;
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ${
+                                isPdf
+                                  ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                  : "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                              }`}
+                            >
+                              {isPdf ? "PDF" : "IMG"}
+                            </span>
+                          )}
+
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">
+                              {doc.title}
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate font-mono">
+                              {doc.originalFileName}
+                              {formattedSize && ` • ${formattedSize}`}
+                              {` • ${doc.documentType?.replace(/_/g, " ")}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewDoc({
+                                title: doc.title,
+                                documentType: doc.documentType,
+                                originalFileName: doc.originalFileName,
+                                mimeType: doc.mimeType,
+                                fileSizeBytes: doc.fileSizeBytes,
+                                sha256Hash: doc.sha256Hash,
+                                url: doc.url || effectiveUrl,
+                                downloadUrl,
+                                storageKey: doc.storageKey,
+                              })
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer shadow-2xs"
+                          >
+                            <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Inspect</span>
+                          </button>
+                          <a
+                            href={downloadUrl}
+                            download={doc.originalFileName}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 text-xs text-slate-500 hover:bg-slate-100 hover:text-emerald-700 transition cursor-pointer shadow-2xs"
+                            title="Download Document"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <div className="mt-4 space-y-2">
               <label className="block text-xs font-bold text-slate-700">
                 Statutory Review Remarks (Mandatory for audit trail) <span className="text-rose-500">*</span>
@@ -872,6 +1024,13 @@ export default function VerificationsPage() {
           </div>
         </div>
       )}
+
+      {/* In-App Lightbox Document Previewer */}
+      <DocumentPreviewModal
+        document={previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        institutionName={selectedInst?.name}
+      />
     </div>
   );
 }

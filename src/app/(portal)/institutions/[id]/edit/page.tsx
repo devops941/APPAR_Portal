@@ -20,6 +20,10 @@ import { StateDistrictSelect } from "@/components/ui/StateDistrictSelect";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { EmailInput } from "@/components/ui/EmailInput";
 import { formatIndianPhone } from "@/lib/data/india-geo";
+import {
+  InstitutionDocumentUploader,
+  type InstitutionDocItem,
+} from "@/components/institutions/InstitutionDocumentUploader";
 
 const CATEGORIES = [
   { value: "ENGINEERING", label: "Engineering & Technology (B.E. / B.Tech / M.Tech)" },
@@ -53,6 +57,7 @@ export default function EditInstitutionPage({
   });
 
   const [status, setStatus] = useState<string>("DRAFT");
+  const [documents, setDocuments] = useState<InstitutionDocItem[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -80,6 +85,7 @@ export default function EditInstitutionPage({
             principalName: inst.principalName || "",
           });
           setStatus(inst.status || "DRAFT");
+          setDocuments(inst.documents || []);
         } else {
           setErrorMsg(data.error?.message || "Failed to load institution details.");
         }
@@ -125,6 +131,7 @@ export default function EditInstitutionPage({
       contactEmail: form.contactEmail.trim().toLowerCase(),
       contactPhone: formattedPhone || form.contactPhone.trim(),
       principalName: form.principalName.trim(),
+      documents,
     };
 
     try {
@@ -358,6 +365,14 @@ export default function EditInstitutionPage({
                 />
               </div>
             </div>
+
+            {/* Statutory Accreditation Documents (Cloudinary Multi-Upload) */}
+            <InstitutionDocumentUploader
+              documents={documents}
+              onChange={setDocuments}
+              disabled={saving}
+              institutionId={id}
+            />
           </div>
 
           {/* Sidebar Column (4 cols): Contacts & Update Controls */}

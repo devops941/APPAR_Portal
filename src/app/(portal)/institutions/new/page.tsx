@@ -21,6 +21,10 @@ import { StateDistrictSelect } from "@/components/ui/StateDistrictSelect";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { EmailInput } from "@/components/ui/EmailInput";
 import { formatIndianPhone } from "@/lib/data/india-geo";
+import {
+  InstitutionDocumentUploader,
+  type InstitutionDocItem,
+} from "@/components/institutions/InstitutionDocumentUploader";
 
 const CATEGORIES = [
   { value: "ENGINEERING", label: "Engineering & Technology (B.E. / B.Tech / M.Tech)" },
@@ -48,6 +52,7 @@ export default function NewInstitutionPage() {
     principalName: "",
   });
 
+  const [documents, setDocuments] = useState<InstitutionDocItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -101,6 +106,7 @@ export default function NewInstitutionPage() {
       contactEmail: form.contactEmail.trim().toLowerCase(),
       contactPhone: formattedPhone || form.contactPhone.trim(),
       principalName: form.principalName.trim(),
+      documents,
     };
 
     try {
@@ -333,6 +339,13 @@ export default function NewInstitutionPage() {
                 />
               </div>
             </div>
+
+            {/* Card 3: Statutory Accreditation Documents (Cloudinary Multi-Upload) */}
+            <InstitutionDocumentUploader
+              documents={documents}
+              onChange={setDocuments}
+              disabled={loading}
+            />
           </div>
 
           {/* Sidebar Column (4 cols): Contacts & Compliance Guidance */}

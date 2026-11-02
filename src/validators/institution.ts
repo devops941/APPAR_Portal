@@ -1,5 +1,26 @@
 import { z } from "zod";
 
+export const institutionDocumentSchema = z.object({
+  title: z.string().min(1, "Document title is required"),
+  documentType: z.enum([
+    "AICTE_APPROVAL",
+    "UGC_RECOGNITION",
+    "AFFILIATION_CERTIFICATE",
+    "LAND_OWNERSHIP",
+    "GOV_NOC",
+    "SOCIETY_TRUST_DEED",
+    "OTHER",
+  ]),
+  originalFileName: z.string().min(1),
+  mimeType: z.string().min(1),
+  fileSizeBytes: z.number().nonnegative(),
+  storageKey: z.string().min(1),
+  storageProvider: z.enum(["cloudinary", "local"]).default("cloudinary"),
+  sha256Hash: z.string().min(1),
+  url: z.string().optional(),
+  uploadedAt: z.union([z.date(), z.string()]).optional(),
+});
+
 export const createInstitutionSchema = z.object({
   name: z.string().min(2, "Institution name is required"),
   code: z
@@ -18,6 +39,7 @@ export const createInstitutionSchema = z.object({
   contactPhone: z.string().min(1, "Contact phone is required"),
   principalName: z.string().min(1, "Principal name is required"),
   approvalReference: z.string().min(1, "AICTE approval reference is required"),
+  documents: z.array(institutionDocumentSchema).optional(),
 });
 
 export const updateInstitutionSchema = z.object({
@@ -37,6 +59,7 @@ export const updateInstitutionSchema = z.object({
   contactPhone: z.string().optional(),
   principalName: z.string().optional(),
   approvalReference: z.string().optional(),
+  documents: z.array(institutionDocumentSchema).optional(),
 });
 
 export const reviewInstitutionSchema = z.object({

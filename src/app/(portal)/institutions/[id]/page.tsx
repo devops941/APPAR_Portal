@@ -5,11 +5,20 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, CheckCircle2, XCircle, AlertCircle, Send,
   Building2, Mail, Phone, MapPin, User, FileCheck, Shield,
-  Clock, Calendar, Award, Edit3
+  Clock, Calendar, Award, Edit3, FileText, Download, ExternalLink,
+  Eye, FileCheck2, Cloud, Plus
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { KpiStatCard } from "@/components/ui/KpiStatCard";
+import {
+  DocumentPreviewModal,
+  type PreviewableDocument,
+} from "@/components/ui/DocumentPreviewModal";
+import {
+  InstitutionDocumentUploader,
+  type InstitutionDocItem,
+} from "@/components/institutions/InstitutionDocumentUploader";
 import Link from "next/link";
 
 interface Institution {
@@ -23,6 +32,7 @@ interface Institution {
   principalName: string;
   approvalReference: string;
   status: string;
+  documents?: InstitutionDocItem[];
   reviewRemarks?: string;
   reviewedAt?: string;
   createdAt?: string;
@@ -36,6 +46,30 @@ export default function InstitutionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<PreviewableDocument | null>(null);
+  const [showUploader, setShowUploader] = useState(false);
+  const [savingDocs, setSavingDocs] = useState(false);
+
+  async function handleDirectSaveDocs(newDocs: InstitutionDocItem[]) {
+    setSavingDocs(true);
+    try {
+      const res = await fetch(`/api/institutions/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documents: newDocs }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setInstitution((prev) =>
+          prev ? { ...prev, documents: newDocs } : prev
+        );
+      }
+    } catch (e) {
+      console.error("Failed to save documents to institution:", e);
+    } finally {
+      setSavingDocs(false);
+    }
+  }
 
   useEffect(() => {
     fetch(`/api/institutions/${params.id}`)
@@ -231,6 +265,187 @@ export default function InstitutionDetailPage() {
             </div>
           </div>
 
+          {/* Statutory Accreditation Documents */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <FileCheck2 className="h-4 w-4 text-emerald-600" />
+                <h3 className="text-base font-bold text-slate-900">Statutory Accreditation Documents</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                  <Cloud className="h-3.5 w-3.5" /> Cloudinary Verified
+                </span>
+                <Button
+                  size="sm"
+                  variant={showUploader ? "secondary" : "primary"}
+                  onClick={() => setShowUploader(!showUploader)}
+                  className="gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>{showUploader ? "Close Uploader" : "Upload Documents"}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* In-Place Direct Document Uploader */}
+            {showUploader && (
+              <div className="mt-4 animate-in fade-in">
+                <InstitutionDocumentUploader
+                  documents={institution.documents || []}
+                  onChange={(newDocs) => {
+                    setInstitution((prev) =>
+                      prev ? { ...prev, documents: newDocs } : prev
+                    );
+                  }}
+                  onDirectSave={handleDirectSaveDocs}
+                  institutionId={institution._id}
+                  disabled={savingDocs}
+                />
+              </div>
+            )}
+
+            {(!institution.documents || institution.documents.length === 0) ? (
+              <div className="mt-4 rounded-xl border border-dashed border-slate-200 py-6 text-center text-xs text-slate-500">
+                <FileText className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                <p className="font-semibold text-slate-700">No Statutory Documents Attached</p>
+                <p className="mt-0.5 text-slate-400">
+                  Click &quot;Upload Documents&quot; above to attach statutory AICTE letters or UGC orders to this profile.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-100 bg-slate-50/50 overflow-hidden">
+                {institution.documents.map((doc, idx) => {
+                  const formattedSize = doc.fileSizeBytes
+                    ? doc.fileSizeBytes > 1024 * 1024
+                      ? `${(doc.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB`
+                      : `${Math.round(doc.fileSizeBytes / 1024)} KB`
+                    : null;
+
+                  const isPdf =
+                    doc.mimeType?.includes("pdf") ||
+                    doc.originalFileName?.toLowerCase().endsWith(".pdf");
+
+                  const downloadUrl = `/api/institutions/${institution._id}/documents/${doc._id || doc.storageKey}/download`;
+                  const streamUrl = doc.storageKey
+                    ? `/api/institutions/preview?key=${encodeURIComponent(
+                        doc.storageKey
+                      )}&provider=${doc.storageProvider || "cloudinary"}&name=${encodeURIComponent(
+                        doc.originalFileName
+                      )}`
+                    : "";
+                  const effectiveUrl = doc.url || downloadUrl || streamUrl;
+
+                  return (
+                    <div
+                      key={doc._id?.toString() || doc.storageKey || idx}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 transition hover:bg-slate-100/60"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* High-res Image Thumbnail or PDF Badge */}
+                        {!isPdf && effectiveUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={effectiveUrl}
+                            alt={doc.title}
+                            className="h-11 w-11 shrink-0 rounded-xl object-cover border border-slate-200 shadow-2xs cursor-pointer hover:opacity-90 transition"
+                            onClick={() =>
+                              setPreviewDoc({
+                                title: doc.title,
+                                documentType: doc.documentType,
+                                originalFileName: doc.originalFileName,
+                                mimeType: doc.mimeType,
+                                fileSizeBytes: doc.fileSizeBytes,
+                                sha256Hash: doc.sha256Hash,
+                                url: doc.url || effectiveUrl,
+                                downloadUrl,
+                                storageKey: doc.storageKey,
+                              })
+                            }
+                            onError={(e) => {
+                              if (streamUrl && e.currentTarget.src !== streamUrl) {
+                                e.currentTarget.src = streamUrl;
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold text-xs ${
+                              isPdf
+                                ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                : "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                            }`}
+                          >
+                            {isPdf ? "PDF" : "IMG"}
+                          </div>
+                        )}
+
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900 truncate">
+                              {doc.title}
+                            </span>
+                            <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-700 border border-emerald-200">
+                              {doc.documentType?.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5 font-mono">
+                            {doc.originalFileName}
+                            {formattedSize && ` • ${formattedSize}`}
+                            {doc.sha256Hash && ` • Seal: ${doc.sha256Hash.substring(0, 10)}...`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewDoc({
+                              title: doc.title,
+                              documentType: doc.documentType,
+                              originalFileName: doc.originalFileName,
+                              mimeType: doc.mimeType,
+                              fileSizeBytes: doc.fileSizeBytes,
+                              sha256Hash: doc.sha256Hash,
+                              url: doc.url || effectiveUrl,
+                              downloadUrl,
+                              storageKey: doc.storageKey,
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-2xs hover:bg-emerald-50 transition cursor-pointer"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>View Document</span>
+                        </button>
+
+                        <a
+                          href={downloadUrl}
+                          download={doc.originalFileName}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-emerald-700 transition cursor-pointer"
+                          title="Download Document"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Download</span>
+                        </a>
+
+                        <a
+                          href={effectiveUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1.5 text-xs text-slate-500 hover:bg-slate-50 hover:text-emerald-700 transition cursor-pointer"
+                          title="Open in Tab"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Review Remarks Log */}
           {institution.reviewRemarks && (
             <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
@@ -386,6 +601,13 @@ export default function InstitutionDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Lightbox Document Viewer */}
+      <DocumentPreviewModal
+        document={previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        institutionName={institution.name}
+      />
     </div>
   );
 }

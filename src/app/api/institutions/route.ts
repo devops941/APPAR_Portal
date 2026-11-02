@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
 
     const institution = await Institution.create({
       ...parsed.data,
+      documents: parsed.data.documents || [],
       code: parsed.data.code.toUpperCase(),
       status: "DRAFT",
     });

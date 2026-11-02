@@ -96,6 +96,11 @@ export async function PATCH(
       };
       delete updates.address;
     }
+    if (updates.documents) {
+      institution.documents = updates.documents as any;
+      institution.markModified("documents");
+      delete updates.documents;
+    }
     Object.assign(institution, updates);
     await institution.save();
 

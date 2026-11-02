@@ -50,7 +50,7 @@ async function ensureUploadDirExists() {
 export async function saveFile(
   buffer: Buffer,
   originalName: string
-): Promise<{ storageKey: string; sha256Hash: string; provider: "cloudinary" | "local" }> {
+): Promise<{ storageKey: string; sha256Hash: string; provider: "cloudinary" | "local"; url?: string }> {
   const sha256Hash = computeSha256(buffer);
   const ext = path.extname(originalName).toLowerCase();
 
@@ -60,14 +60,14 @@ export async function saveFile(
   if (env.DOCUMENT_STORAGE_PROVIDER === "cloudinary" && env.CLOUDINARY_CLOUD_NAME) {
     const cloud = await getCloudinary();
 
-    const result: { public_id?: string } = await new Promise((resolve, reject) => {
+    const result: { public_id?: string; secure_url?: string; url?: string } = await new Promise((resolve, reject) => {
       const uploadStream = cloud.uploader.upload_stream(
         {
           resource_type: "auto",
           folder: env.DOCUMENT_STORAGE_BUCKET || "apaar-documents",
           public_id: `${uuidv4()}`,
         },
-        (error: Error | null, res: { public_id?: string } | undefined) => {
+        (error: Error | null, res: { public_id?: string; secure_url?: string; url?: string } | undefined) => {
           if (error) return reject(error);
           resolve(res || {});
         }
@@ -76,6 +76,7 @@ export async function saveFile(
     });
 
     const storageKey = result?.public_id ?? `${uuidv4()}`;
+    const url = result?.secure_url || result?.url;
 
     // Cache locally with sanitized key
     try {
@@ -89,6 +90,7 @@ export async function saveFile(
       storageKey,
       sha256Hash,
       provider: "cloudinary",
+      url,
     };
   }
 
