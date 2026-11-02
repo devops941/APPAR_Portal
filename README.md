@@ -1,38 +1,68 @@
-# APPAR_Portal
+# APPAR Portal: Automated Permanent Academic Account Registry & Academic Depository
 
-Automated Permanent Academic Account Registry (APAAR) & Student Depository Platform
+> A production-grade, multi-tenant digital academic repository and student credit passport aligned with the **National Education Policy (NEP 2020)** and **AICTE / UGC** guidelines.
 
-This is a [Next.js](https://nextjs.org) project.
+---
 
-First, run the development server:
+## 📖 Quick Links
+- **Full Architecture & Technical Documentation**: See [DOCUMENTATION.md](./DOCUMENTATION.md)
+- **Final Year Engineering Project Report**: See [FINAL_YEAR_PROJECT_REPORT.md](./FINAL_YEAR_PROJECT_REPORT.md)
 
-```bash
+---
+
+## 🚀 Quick Start Guide
+
+### 1. Prerequisites
+- **Node.js**: `v20.x` or higher
+- **MongoDB Atlas**: Cloud connection string configured in `.env.local`
+- **Cloudinary**: Cloud name, API key & secret configured in `.env.local`
+
+### 2. Installation & Setup
+```powershell
+# Install project dependencies
+npm install
+
+# Wipe and seed database with 2 HEIs, 4 Students, 8 Documents, and all personas
+npm run seed
+
+# Verify seeded MongoDB records
+npm run seed:verify
+
+# Run automated unit & integration tests
+npm test
+
+# Start Next.js development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 👥 Demo Logins & Test Accounts
 
-## Learn More
+| Role | Email | Password | Primary Workflow |
+| :--- | :--- | :--- | :--- |
+| **Super Admin** | `admin@aicte.gov.in` | `Admin@123` | National AICTE portal oversight & HEI management |
+| **Verification Officer** | `officer1@aicte.gov.in` | `Demo@12345` | Statutory Scrutiny Desk (`/verifications`) with White Theme document inspector |
+| **Institution Admin (NITT)** | `admin.nitt@nitt.edu` | `Demo@12345` | NIT Trichy campus administration, catalog & admissions |
+| **Institution Admin (GCT)** | `admin.gct@gct.ac.in` | `Demo@12345` | GCT Coimbatore campus administration |
+| **Faculty Member (CSE)** | `faculty.cse@nitt.edu` | `Demo@12345` | Semester grade entry and marksheet upload |
+| **Student (Arun Kumar)** | `arun.kumar@nitt.edu` | `Demo@12345` | Digital APAAR passport, QR card, transcript vault |
+| **Student (Priya Sundaram)** | `priya.s@nitt.edu` | `Demo@12345` | Student self-service portal |
+| **Student (Sneha)** | `sneha.r@gct.ac.in` | `Demo@12345` | Pending verification record for scrutiny testing |
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🏛️ Key Features
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **12-Digit Lifelong APAAR Generation**: Automated unique identifier generation adhering to Ministry of Education guidelines.
+- **Statutory Document Scrutiny Desk**: Multi-file document upload (AICTE EOA, UGC 2(f)/12(B), University Affiliation) stored on Cloudinary with inline streaming and **Pure White Theme** modal scrutiny.
+- **Cryptographic SHA-256 Seals**: Tamper-proof hash validation for all institutional and student academic files.
+- **UGC/AICTE 10-Point Grade Math**: Automated calculation of SGPA and CGPA without human calculation discrepancies.
+- **Multi-Tenant Campus Isolation**: Enforced tenant scoping on all academic entities, departments, subjects, and records.
+- **Public QR Attestation**: Zero-auth public verification page (`/verify`) with instant QR scanning.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+*For detailed data models, sequence diagrams, and full API specifications, please refer to [DOCUMENTATION.md](./DOCUMENTATION.md).*
